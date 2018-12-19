@@ -97,7 +97,35 @@ module.exports = async function(options) {
     reconnectInterval: 1000
   });
 
-  let mongoDriverVersion = (typeof db.db === 'function') ? 3 : 2;
+  const mongoDriverVersion = (typeof db.db === 'function') ? 3 : 2;
+
+  if (mongoDriverVersion === 3) {
+          const superFind = mongo.Collection.prototype.find;
+          // Introduce a findWithProjection method supporting the old
+          // 2.x (and prior) calling convention. This method supports
+          // all of the previously valid ways of invoking `find()` in 2.x,
+          // including calling with callbacks, returning promises, etc.
+          // (provided there are no unrelated bc breaks to those features in 3.x).
+          //
+          // It operates by splicing the projection argument, when present,
+          // into the new options argument.
+          mongo.Collection.prototype.findWithProjection = function(query, projection) {
+              if ((typeof projection) !== 'object') {
+                  return superFind.apply(this, arguments);
+              }
+              const args = Array.prototype.slice.call(arguments, 0);
+              args[1] = {
+                  projection: args[1]
+              };
+              return superFind.apply(this, args);
+          };
+
+          mongo.Collection.prototype.aposVerifyPatched = true;
+
+          // For bc, bring back the classic `nextObject` method name as a
+          // simple alias for the `next` method.
+          mongo.Cursor.prototype.nextObject = mongo.Cursor.prototype.next;
+  }
 
   // required on behalf of the application, so it can see the peer dependency
   const apostrophe = require(getNpmPath(options.root, 'apostrophe'));
