@@ -41,7 +41,7 @@ module.exports = async function(options) {
       attempt();
     }
     return Promise.promisify(body)();
-  }
+  };
 
   // Implementation
 
@@ -88,7 +88,7 @@ module.exports = async function(options) {
   if (process.env.DASHBOARD_HOSTNAME) {
     options.dashboardHostname = process.env.DASHBOARD_HOSTNAME;
   }
-  
+
   // All sites running under this process share a mongodb connection object
   const db = await mongo.MongoClient.connect(options.mongodbUrl, {
     autoReconnect: true,
@@ -96,6 +96,8 @@ module.exports = async function(options) {
     reconnectTries: Number.MAX_VALUE,
     reconnectInterval: 1000
   });
+
+  let mongoDriverVersion = (typeof db.db === 'function') ? 3 : 2;
 
   // required on behalf of the application, so it can see the peer dependency
   const apostrophe = require(getNpmPath(options.root, 'apostrophe'));
@@ -228,7 +230,7 @@ module.exports = async function(options) {
 
     apos = await runner(options.sites || {});
     return apos;
-    
+
     function run(config, callback) {
 
       let viewsFolderFallback = getRootDir() + '/sites/views';
@@ -236,7 +238,8 @@ module.exports = async function(options) {
         viewsFolderFallback = undefined;
       }
 
-      const apos = apostrophe(
+        const shortName = options.shortNamePrefix + site._id;
+        const apos = apostrophe(
 
         _.merge({
 
@@ -247,18 +250,18 @@ module.exports = async function(options) {
             return callback(null, apos);
           },
 
-          rootDir: getRootDir() + '/sites', 
+          rootDir: getRootDir() + '/sites',
 
           npmRootDir: getRootDir(),
-               
-          shortName: options.shortNamePrefix + site._id,
-          
+
+          shortName: shortName,
+
           modules: {
 
             'apostrophe-db': {
-              db: db
+              db: mongoDriverVersion === 3 ? db.db(shortName) : db
             },
-            
+
             'apostrophe-i18n': {
               localesDir: getRootDir() + '/locales'
             },
@@ -272,7 +275,7 @@ module.exports = async function(options) {
                 secret: options.sessionSecret
               }
             },
-            
+
             'apostrophe-attachments': {
               uploadfs: {
                 prefix: '/' + site._id,
@@ -288,7 +291,7 @@ module.exports = async function(options) {
                 self.apos.listen = function() {
                   if (self.apos.options.afterListen) {
                     return self.apos.options.afterListen(null);
-                  }                  
+                  }
                 }
               }
             },
@@ -339,11 +342,11 @@ module.exports = async function(options) {
     // constellation at some point?
 
     const finalConfig = _.merge({}, options.dashboard || {}, config);
-    
+
     const apos = await require('util').promisify(run)(finalConfig);
-    
+
     return apos;
-    
+
     function run(config, callback) {
 
       let viewsFolderFallback = getRootDir() + '/dashboard/views';
@@ -351,7 +354,8 @@ module.exports = async function(options) {
         viewsFolderFallback = undefined;
       }
 
-      const apos = apostrophe(
+        const shortName = options.shortNamePrefix + 'dashboard';
+        const apos = apostrophe(
 
         _.merge({
 
@@ -368,12 +372,12 @@ module.exports = async function(options) {
             return callback(null, apos);
           },
 
-          rootDir: getRootDir() + '/dashboard', 
+          rootDir: getRootDir() + '/dashboard',
 
           npmRootDir: getRootDir(),
-                
-          shortName: options.shortNamePrefix + 'dashboard',
-          
+
+          shortName: shortName,
+
           modules: {
 
             'apostrophe-assets': {
@@ -394,9 +398,9 @@ module.exports = async function(options) {
             },
 
             'apostrophe-db': {
-              db: db
+               db: mongoDriverVersion === 3 ? db.db(shortName) : db
             },
-          
+
             'apostrophe-templates': {
               viewsFolderFallback: viewsFolderFallback
             },
@@ -406,7 +410,7 @@ module.exports = async function(options) {
                 secret: options.sessionSecret
               }
             },
-            
+
             'apostrophe-attachments': {
               uploadfs: {
                 prefix: '/dashboard',
@@ -422,7 +426,7 @@ module.exports = async function(options) {
                 self.apos.listen = function() {
                   if (self.apos.options.afterListen) {
                     return self.apos.options.afterListen(null);
-                  }                  
+                  }
                 }
               }
             },
@@ -464,7 +468,7 @@ module.exports = async function(options) {
           }
         }, config)
       );
-    }      
+    }
   }
 
   async function runTask() {
@@ -479,7 +483,7 @@ module.exports = async function(options) {
     // that has already built dashboard assets. All we want from it is access
     // to the database of other sites
     dashboard = await spinUpDashboard(
-      { 
+      {
         argv: { _: [] },
         modules: {
           'apostrophe-assets': {
